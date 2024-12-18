@@ -1,37 +1,41 @@
 import tkinter as tk
-from tkinter import ttk
-import numpy as np
+from tkinter import ttk, messagebox
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+import threading
+import matplotlib
+matplotlib.use('TkAgg')
 
-# Create the main application window
+from sir_solver import solve_sir  
+
+# Krijimi i window/dritares kryesore
 root = tk.Tk()
 root.title("Epidemic Simulation - SIR Model")
-root.geometry("900x700")  # Set the window size
+root.geometry("900x700")  
 
-# ---- Left Panel for Inputs ----
+# ---- Vendi i inputave ----
 input_frame = tk.Frame(root, width=200, padx=10, pady=10)
 input_frame.pack(side=tk.LEFT, fill=tk.Y)
 
-# Add input fields
+# Inputat:
 tk.Label(input_frame, text="Numri i Popullsise:").pack(anchor="w")
 population_entry = tk.Entry(input_frame)
 population_entry.pack(fill=tk.X, pady=5)
 
-tk.Label(input_frame, text="Sa Jane te Infektuar:").pack(anchor="w")
+tk.Label(input_frame, text="Te Infektuar:").pack(anchor="w")
 infected_entry = tk.Entry(input_frame)
 infected_entry.pack(fill=tk.X, pady=5)
 
-tk.Label(input_frame, text="Shperndarja (Beta):").pack(anchor="w")
+tk.Label(input_frame, text="Transmission Rate (Beta):").pack(anchor="w")
 beta_entry = tk.Entry(input_frame)
 beta_entry.pack(fill=tk.X, pady=5)
 
-tk.Label(input_frame, text="Sherimi (Gamma):").pack(anchor="w")
+tk.Label(input_frame, text="Recovery Rate (Gamma):").pack(anchor="w")
 gamma_entry = tk.Entry(input_frame)
 gamma_entry.pack(fill=tk.X, pady=5)
 
-# Add buttons
+# Butonat:
 button_frame = tk.Frame(input_frame)
 button_frame.pack(pady=20)
 
@@ -41,133 +45,112 @@ start_button.pack(side=tk.LEFT, padx=5)
 stop_button = tk.Button(button_frame, text="Stop", bg="red", fg="white", width=10)
 stop_button.pack(side=tk.LEFT, padx=5)
 
-# ---- Main Panel for Simulation and Graphs ----
+# ---- Paneli kryesor ku ka mu shfaq grafi dhe stimulimi ----
 main_frame = tk.Frame(root, padx=10, pady=10)
 main_frame.pack(side=tk.RIGHT, expand=True, fill=tk.BOTH)
 
-# Graph display
+# Display i grafit:
 graph_frame = tk.Frame(main_frame)
 graph_frame.pack(fill=tk.BOTH, expand=True)
 
-canvas = None
-animation = None  # Variable to store the animation instance
+fig, ax = plt.subplots()
+canvas = FigureCanvasTkAgg(fig, master=graph_frame)
+canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+animation = None
 
+stop_event = threading.Event()
 
-# ---- Functionality for SIR Model ----
-def sir_model(population, initial_infected, beta, gamma, max_steps=1000):
-    """
-    Generator function for simulating the SIR model dynamics in real-time.
-
-        Args:
-            population: Total population size.
-            initial_infected: Initial number of infected individuals.
-            beta: Transmission rate.
-            gamma: Recovery rate.
-            max_steps: Maximum number of simulation steps.
-
-        Yields:
-            step: Current time step.
-            S, I, R: Current values of susceptible, infected, and recovered.
-    """
-    S = population - initial_infected
-    I = initial_infected
-    R = 0
-
-    for step in range(max_steps):
-        dS = -beta * S * I / population
-        dI = beta * S * I / population - gamma * I
-        dR = gamma * I
-
-        S = max(S + dS, 0)
-        I = max(I + dI, 0)
-        R = max(R + dR, 0)
-
-        yield step, S, I, R
-
-        if I <= 0:  # Stop when no more infected individuals
-            break
-
-def start_simulation():
-    """Starts the SIR simulation and updates the graph dynamically."""
-    # Get user inputs
+def validate_inputs():
+    """Validates the user inputs and returns them as a dictionary."""
+      
     try:
         population = int(population_entry.get())
         initial_infected = int(infected_entry.get())
         beta = float(beta_entry.get())
         gamma = float(gamma_entry.get())
-    except ValueError:
-        print("Error: Invalid input values!")
-        return
+    
+        # Logjika
+        if population <= 0 or initial_infected < 0 or initial_infected > population:
+            raise ValueError("Vlera jo-valide ne lidhje me numrin e popullsise ose te infektuarve.")
+        if beta <= 0 or gamma <= 0:
+            raise ValueError("Beta dhe Gamma duhet te jene pozitive.")
 
-    # Clear previous canvas
-    global canvas, animation
-    if canvas:
-        canvas.get_tk_widget().destroy()
-    if animation:
-        animation.event_source.stop()
 
-    # Create the figure
-    fig, ax = plt.subplots(figsize=(8, 5))
-    ax.set_xlim(0, 100)  # Start with 100 steps and dynamically adjust later
-    ax.set_ylim(0, population)
-    ax.set_title("SIR Model Dynamics")
-    ax.set_xlabel("Time")
-    ax.set_ylabel("Population")
-    ax.grid()
+            return {
+            "population": population,
+            "initial_infected": initial_infected,
+            "beta": beta,
+            "gamma": gamma,
+        }
+    except ValueError as e:
+        messagebox.showerror("Vlera Jo-Valide", str(e))
+        return None
+    
 
-    line_S, = ax.plot([], [], label="Susceptible", color="blue")
-    line_I, = ax.plot([], [], label="Infected", color="red")
-    line_R, = ax.plot([], [], label="Recovered", color="green")
-    ax.legend()
+def start_simulation():
 
-    time_data = []
-    S_data = []
-    I_data = []
-    R_data = []
+    """Starts the SIR simulation."""
 
-    # Generator for real-time SIR model updates
-    sir_gen = sir_model(population, initial_infected, beta, gamma)
+    inputs = validate_inputs()
+    if not inputs:
+        return  
+    
 
-    # Animation update function
-    def update(frame):
-        step, S, I, R = next(sir_gen)
+    stop_event.clear()  
+    ax.clear()  
 
-        # Append data
-        time_data.append(step)
-        S_data.append(S)
-        I_data.append(I)
-        R_data.append(R)
+    def run_simulation():
+        try:
+            population = inputs["population"]
+            initial_infected = inputs["initial_infected"]
+            beta = inputs["beta"]
+            gamma = inputs["gamma"]
 
-        # Update data
-        line_S.set_data(time_data, S_data)
-        line_I.set_data(time_data, I_data)
-        line_R.set_data(time_data, R_data)
+            S0 = population - initial_infected
+            I0 = initial_infected
+            R0 = 0
+            t_max = 10000
+            tol = 1e-1
 
-        # Dynamically adjust the x-axis if the time exceeds the current limit
-        if step >= ax.get_xlim()[1]:
-            ax.set_xlim(0, step + 50)
+            results = solve_sir(S0, I0, R0, beta, gamma, t_max, tol)
 
-        return line_S, line_I, line_R
+            t_values = results[:, 0]  
+            s_values = results[:, 1]  
+            i_values = results[:, 2]  
+            r_values = results[:, 3]  
+        
+            def update(frame):
+                ax.clear()
+                ax.plot(t_values[:frame], s_values[:frame], label="Susceptible", color='blue')
+                ax.plot(t_values[:frame], i_values[:frame], label="Infektuar", color='red')
+                ax.plot(t_values[:frame], r_values[:frame], label="Sheruar", color='green')
+                ax.set_title("SIR Model")
+                ax.set_xlabel("Koha")
+                ax.set_ylabel("Popullsia")
+                ax.legend()
 
-    # Create animation
-    animation = FuncAnimation(fig, update, interval=100, blit=True, save_count=1000)
+            global animation
+            animation = FuncAnimation(fig, update, frames=len(t_values), interval=50, repeat=False)
+            canvas.draw()
 
-    # Embed the animated plot in Tkinter
-    canvas = FigureCanvasTkAgg(fig, master=graph_frame)
-    canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
-    canvas.draw()
+        except Exception as e:
+            messagebox.showerror("Error", f"U shfaq nje error: {e}")
+    
+    threading.Thread(target=run_simulation).start()
+
 
 
 def stop_simulation():
-    """Stops the animation."""
+    """Stops the simulation."""
     global animation
     if animation:
         animation.event_source.stop()
+        stop_event.set()
 
 
-# Link buttons to their respective functions
+# Lidhja e butonava me funksionet e tyre
 start_button.config(command=start_simulation)
 stop_button.config(command=stop_simulation)
 
-# Start the main loop
+
 root.mainloop()

@@ -15,6 +15,9 @@ def adaptive_rk(f, y0, t_max, tol, params):
     Returns:
         np.array: Array of results with time and state variables.
     """
+
+    print(f"adaptive_rk called with y0={y0}, t_max={t_max}, tol={tol}, params={params}")
+
     t = 0
     h = 0.1  # Initial step size
     y = np.array(y0)
