@@ -1,50 +1,49 @@
 import numpy as np
 
-
-def adaptive_rk(f, y0, t_max, tol, params):
+def rkf45(f, y0, t_max, tol, params):
     """
-    General solver using an adaptive Runge-Kutta method.
-
-    Parameters:
-        f (function): Function to compute derivatives. Must take (y, params) as arguments.
-        y0 (list or np.array): Initial state values.
-        t_max (float): Maximum simulation time.
-        tol (float): Tolerance for error.
-        params (dict): Additional parameters required by the derivative function.
-
-    Returns:
-        np.array: Array of results with time and state variables.
+    Implementation of the Runge-Kutta-Fehlberg (RKF45) method for ODE solving.
     """
-
-    print(f"adaptive_rk called with y0={y0}, t_max={t_max}, tol={tol}, params={params}")
+    a = [0, 1/4, 3/8, 12/13, 1, 1/2]
+    b = [
+        [],
+        [1/4],
+        [3/32, 9/32],
+        [1932/2197, -7200/2197, 7296/2197],
+        [439/216, -8, 3680/513, -845/4104],
+        [-8/27, 2, -3544/2565, 1859/4104, -11/40]
+    ]
+    c = [16/135, 0, 6656/12825, 28561/56430, -9/50, 2/55]
+    dc = [1/360, 0, -128/4275, -2197/75240, 1/50, 2/55]
 
     t = 0
     h = 0.1  # Initial step size
     y = np.array(y0)
     results = [(t, *y)]
 
+    epsilon = 1e-10  # Small number to prevent division by zero
+
     while t < t_max:
-        # Compute derivatives using the function f
-        k1 = np.array(f(y, params))
-        k2 = np.array(f(y + h * k1 / 2, params))
+        k = []
+        for i in range(6):
+            y_temp = y + h * sum(b[i][j] * k[j] for j in range(i)) if i > 0 else y
+            k.append(np.array(f(y_temp, params)))
 
-        # RK2 step (low-order)
-        y_half = y + h * k1 / 2
+        # Calculate the 5th-order (high-order) and 4th-order (low-order) estimates
+        y5 = y + h * sum(c[j] * k[j] for j in range(6))
+        y4 = y + h * sum((c[j] + dc[j]) * k[j] for j in range(6))
 
-        # RK4 step (high-order)
-        y_next = y + h * k2
-
-        # Estimate error
-        error = np.max(np.abs(y_next - y_half))
+        # Estimate the error
+        error = np.max(np.abs(y5 - y4))
 
         # Adjust step size
         if error > tol:
-            h /= 2  # Reduce step size
+            h *= max(0.1, 0.84 * (tol / error) ** 0.25)  # Reduce step size
         else:
             t += h
-            y = y_next
+            y = y5
             results.append((t, *y))
-            if error < tol / 2:
-                h *= 2  # Increase step size if error is small
+            if error < epsilon or error < tol / 10:
+                h *= 2  # Increase step size conservatively when error is small
 
     return np.array(results)
