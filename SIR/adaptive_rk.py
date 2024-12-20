@@ -1,8 +1,21 @@
 import numpy as np
 
-def rkf45(f, y0, t_max, tol, params):
+def rkf45(f, y0, t_max, tol, params, h_max=1.0, h_min=1e-6):
+
     """
     Implementation of the Runge-Kutta-Fehlberg (RKF45) method for ODE solving.
+
+    Parameters:
+        f (function): Function to compute derivatives.
+        y0 (list or np.array): Initial state values.
+        t_max (float): Maximum simulation time.
+        tol (float): Error tolerance.
+        params (dict): Additional parameters for the derivative function.
+        h_max (float): Maximum step size.
+        h_min (float): Minimum step size.
+
+    Returns:
+        np.array: Array of results [time, state variables].
     """
     a = [0, 1/4, 3/8, 12/13, 1, 1/2]
     b = [
@@ -24,6 +37,11 @@ def rkf45(f, y0, t_max, tol, params):
     epsilon = 1e-10  # Small number to prevent division by zero
 
     while t < t_max:
+        if h < h_min:
+            raise ValueError("Step size too small. Integration failed.")
+        if t + h > t_max:
+            h = t_max - t  # Adjust final step size
+
         k = []
         for i in range(6):
             y_temp = y + h * sum(b[i][j] * k[j] for j in range(i)) if i > 0 else y
@@ -44,6 +62,7 @@ def rkf45(f, y0, t_max, tol, params):
             y = y5
             results.append((t, *y))
             if error < epsilon or error < tol / 10:
-                h *= 2  # Increase step size conservatively when error is small
+                h = min(h * 2, h_max)  # Increase step size conservatively
+
 
     return np.array(results)
