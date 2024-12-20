@@ -1,6 +1,6 @@
 <p align="center">
   <a href="https://fiek.uni-pr.edu/">
-    <img src="logo1.png" alt="Logo" height="40">
+    <img src="/SIR/foto_gif/logo1.png" alt="Logo" height="40">
   </a>
 
 <h3 align="center">Simulating Epidemic Spread Using SIR Model</h3>
@@ -54,7 +54,8 @@ python file1.py
 ## Shembuj Ekzekutimi
 
 - ### Video Ekzekutimi
-  ![Alt text](foto_gif/SIR.gif)
+![Alt text](/SIR/foto_gif/SIR.gif)
+
 
 
 <br><br><br>
