@@ -1,6 +1,7 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
 import matplotlib.pyplot as plt
+import numpy as np
 from matplotlib.animation import FuncAnimation
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import matplotlib
@@ -100,60 +101,59 @@ def start_simulation():
     def run_simulation():
         try:
             population = inputs["population"]
-            initial_infected = inputs["initial_infected"]
+            initial_infected = max(inputs["initial_infected"], 1)
             beta = inputs["beta"]
             gamma = inputs["gamma"]
 
-            # Prepare initial conditions
+            # Use raw initial conditions
             S0 = population - initial_infected
             I0 = initial_infected
             R0 = 0
 
-            # Solve the SIR model for the calculated duration
-            results = solve_sir(S0, I0, R0, beta, gamma, 500, 1e-8)
-            if results.shape[0] == 0:
-                raise ValueError("No results to plot.")
+            # Calculate epidemic duration
+            epidemic_duration = calculate_epidemic_duration(S0, I0, R0, beta, gamma)
+            print(f"Epidemic Duration: {epidemic_duration:.2f} days")
 
-            # Unpack results
-            t_values = results[:, 0]  # Time values
-            s_values = results[:, 1] * population  # Susceptible scaled to population
-            i_values = results[:, 2] * population  # Infected scaled to population
-            r_values = results[:, 3] * population  # Recovered scaled to population
+            # Solve the SIR model
+            results = solve_sir(S0, I0, R0, beta, gamma, t_max=epidemic_duration + 10, step_size=1.0)
 
-            # Define a threshold for stopping
-            epsilon = 0.1  # Stop when infected count drops below this threshold
-            has_stopped = False  # Flag to ensure clean stopping
-
-            # Update function for animation
+            # Extract results
+            t_values = results[:, 0]
+            s_values = results[:, 1]
+            i_values = results[:, 2]
+            r_values = results[:, 3]
+      
             def update(frame):
-                nonlocal has_stopped  # Allow modification of stopping flag
-
-                # Stop simulation if infected population is below threshold
-                if i_values[frame] <= epsilon and not has_stopped:
-                    has_stopped = True  # Mark as stopped
-                    animation.event_source.stop()  # Stop the animation
-
-                    # Finalize x-axis range safely
-                    if t_values[frame] > 0:
-                        ax.set_xlim(0, t_values[frame])  # Set x-axis to the current time
-                    else:
-                        ax.set_xlim(0, 1)  # Fallback range if t_values[frame] == 0
-                    canvas.draw()  # Update the canvas
+             # Stop the simulation when the infected population reaches near zero
+                if frame >= len(t_values) or i_values[frame] < 1e-6:
+                    animation.event_source.stop()
+                    print(f"Simulation stopped: Infected population reached near zero at day {t_values[frame]:.2f}.")
+                    
+                    
+                    # Final x-axis and canvas adjustments
+                    ax.set_xlim(0, t_values[frame])  # Set final x-axis range
+                    ax.legend()
+                    canvas.draw()
                     return
 
-                # Plot the data up to the current frame
+                # Clear the axis and plot up to the current frame
                 ax.clear()
-                ax.plot(t_values[:frame], s_values[:frame], label="Susceptible", color='blue')
-                ax.plot(t_values[:frame], i_values[:frame], label="Infected", color='red')
-                ax.plot(t_values[:frame], r_values[:frame], label="Recovered", color='green')
+                ax.plot(t_values[:frame + 1], s_values[:frame + 1], label="Susceptible", color='blue')
+                ax.plot(t_values[:frame + 1], i_values[:frame + 1], label="Infected", color='red')
+                ax.plot(t_values[:frame + 1], r_values[:frame + 1], label="Recovered", color='green')
+
+                # Dynamically set the x-axis limits
+                ax.set_xlim(0, max(t_values[:frame + 1], 1))  # Ensure valid x-axis range
+
+                # Set y-axis and graph labels
+                ax.set_ylim(0, population)
                 ax.set_title("SIR Model Simulation")
                 ax.set_xlabel("Time (days)")
                 ax.set_ylabel("Population")
-                ax.set_xlim(0, max(t_values[frame], 1))  # Ensure the x-axis has a valid range
-                ax.set_ylim(0, population)  # Fixed y-axis range
                 ax.legend()
+                canvas.draw()
 
-            # Run the animation with frames limited to the epidemic duration
+            # Run the animation
             global animation
             animation = FuncAnimation(fig, update, frames=len(t_values), interval=50, repeat=False)
             canvas.draw()
@@ -161,10 +161,7 @@ def start_simulation():
         except Exception as e:
             messagebox.showerror("Simulation Error", f"An error occurred: {e}")
 
-    # Run the simulation in a separate thread
     threading.Thread(target=run_simulation).start()
-
-
 
 def stop_simulation():
     """Stops the simulation."""
