@@ -1,67 +1,75 @@
-
 import numpy as np
 
-def rkf45(f, y0, t_max, tol, params, h_max=1.0, h_min=1e-6):
+def backward_euler_sir(S0, I0, R0, beta, gamma, t_max, step_size, tol=1e-6, max_iter=20):
     """
-    Implementation of the Runge-Kutta-Fehlberg (RKF45) method for ODE solving.
+    Solve the SIR model using the Backward Euler method with Newton-Raphson iteration.
 
     Parameters:
-        f (function): Function to compute derivatives.
-        y0 (list or np.array): Initial state values.
+        S0, I0, R0 (float): Initial values for Susceptible, Infected, and Recovered.
+        beta (float): Infection rate.
+        gamma (float): Recovery rate.
         t_max (float): Maximum simulation time.
-        tol (float): Error tolerance.
-        params (dict): Additional parameters for the derivative function.
-        h_max (float): Maximum step size.
-        h_min (float): Minimum step size.
+        step_size (float): Step size for time discretization.
+        tol (float): Convergence tolerance for Newton-Raphson.
+        max_iter (int): Maximum iterations for Newton-Raphson.
 
     Returns:
-        np.array: Array of results [time, state variables].
+        np.array: Array of results [time, S, I, R].
     """
-    a = [0, 1/4, 3/8, 12/13, 1, 1/2]
-    b = [
-        [],
-        [1/4],
-        [3/32, 9/32],
-        [1932/2197, -7200/2197, 7296/2197],
-        [439/216, -8, 3680/513, -845/4104],
-        [-8/27, 2, -3544/2565, 1859/4104, -11/40]
-    ]
-    c = [16/135, 0, 6656/12825, 28561/56430, -9/50, 2/55]
-    dc = [1/360, 0, -128/4275, -2197/75240, 1/50, 2/55]
+    t_values = [0]
+    S, I, R = S0, I0, R0
+    results = [[0, S, I, R]]
 
     t = 0
-    h = 0.1  # Initial step size
-    y = np.array(y0)
-    results = [(t, *y)]
-
-    epsilon = 1e-10  # Small number to prevent division by zero
-
     while t < t_max:
-        if h < h_min:
-            raise ValueError("Step size too small. Integration failed.")
-        if t + h > t_max:
-            h = t_max - t  # Adjust final step size
+        # Stop condition when infected population is effectively zero
+        if I < 1e-6:
+            print(f"Stopping simulation at t={t:.2f} as I < 1e-6")
+            break
 
-        k = []
-        for i in range(6):
-            y_temp = y + h * sum(b[i][j] * k[j] for j in range(i)) if i > 0 else y
-            k.append(np.array(f(y_temp, params)))
+        # Initialize guesses for next step
+        S_next, I_next, R_next = S, I, R
 
-        # Calculate the 5th-order (high-order) and 4th-order (low-order) estimates
-        y5 = y + h * sum(c[j] * k[j] for j in range(6))
-        y4 = y + h * sum((c[j] + dc[j]) * k[j] for j in range(6))
+        # Newton-Raphson iteration
+        for _ in range(max_iter):
+            # Residuals
+            f1 = S_next - S + step_size * beta * S_next * I_next / (S + I + R)
+            f2 = I_next - I - step_size * (beta * S_next * I_next / (S + I + R) - gamma * I_next)
+            f3 = R_next - R - step_size * gamma * I_next
 
-        # Estimate the error
-        error = np.max(np.abs(y5 - y4))
+            # Check for convergence
+            if max(abs(f1), abs(f2), abs(f3)) < tol:
+                break
 
-        # Adjust step size
-        if error > tol:
-            h *= max(0.1, 0.84 * (tol / error) ** 0.25)  # Reduce step size
+            # Jacobian matrix components
+            J11 = 1 + step_size * beta * I_next / (S + I + R)
+            J12 = step_size * beta * S_next / (S + I + R)
+            J21 = -step_size * beta * I_next / (S + I + R)
+            J22 = 1 + step_size * (beta * S_next / (S + I + R) - gamma)
+
+            # Newton step corrections
+            delta_S = -f1 / J11
+            delta_I = -f2 / J22
+            delta_R = -f3
+
+            # Update guesses
+            S_next += delta_S
+            I_next += delta_I
+            R_next += delta_R
+
+            # Ensure non-negativity
+            S_next = max(S_next, 0)
+            I_next = max(I_next, 0)
+            R_next = max(R_next, 0)
+
         else:
-            t += h
-            y = y5
-            results.append((t, *y))
-            if error < epsilon or error < tol / 10:
-                h = min(h * 2, h_max)  # Increase step size conservatively
+            print(f"Warning: Newton-Raphson did not converge at time t={t:.2f}")
+            break
+
+        # Update state variables
+        S, I, R = S_next, I_next, R_next
+        t += step_size
+        t_values.append(t)
+        results.append([t, S, I, R])
 
     return np.array(results)
