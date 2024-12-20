@@ -6,6 +6,7 @@ from matplotlib.animation import FuncAnimation
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import matplotlib
 
+from SIRModel.calculate_epidemic_duration import calculate_epidemic_duration
 
 matplotlib.use('TkAgg')
 from sir_solver import solve_sir  # Import the solver function
@@ -122,28 +123,28 @@ def start_simulation():
             s_values = results[:, 1]
             i_values = results[:, 2]
             r_values = results[:, 3]
-      
+
             def update(frame):
-             # Stop the simulation when the infected population reaches near zero
-                if frame >= len(t_values) or i_values[frame] < 1e-6:
+                # Stop the simulation when the infected population is near zero
+                if frame >= len(t_values) or i_values[frame] <= 0.1:
                     animation.event_source.stop()
                     print(f"Simulation stopped: Infected population reached near zero at day {t_values[frame]:.2f}.")
-                    
-                    
-                    # Final x-axis and canvas adjustments
-                    ax.set_xlim(0, t_values[frame])  # Set final x-axis range
+                    ax.set_xlim(0, t_values[frame])  # Set the final x-axis range
+
+
                     ax.legend()
                     canvas.draw()
                     return
 
-                # Clear the axis and plot up to the current frame
+                # Clear the plot and update with current frame data
                 ax.clear()
                 ax.plot(t_values[:frame + 1], s_values[:frame + 1], label="Susceptible", color='blue')
                 ax.plot(t_values[:frame + 1], i_values[:frame + 1], label="Infected", color='red')
                 ax.plot(t_values[:frame + 1], r_values[:frame + 1], label="Recovered", color='green')
 
                 # Dynamically set the x-axis limits
-                ax.set_xlim(0, max(t_values[:frame + 1], 1))  # Ensure valid x-axis range
+                safe_xlim = max(np.max(t_values[:frame + 1]), 1)  # Use np.max for array handling
+                ax.set_xlim(0, safe_xlim)
 
                 # Set y-axis and graph labels
                 ax.set_ylim(0, population)
