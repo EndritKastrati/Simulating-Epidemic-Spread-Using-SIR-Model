@@ -107,8 +107,8 @@ def start_simulation():
             S0 = population - initial_infected
             I0 = initial_infected
             R0 = 0
-            t_max = 25
-            tol = 1e-3
+            t_max = 500
+            tol = 1e-8
 
             # Call solve_sir
             results = solve_sir(S0, I0, R0, beta, gamma, t_max, tol)
@@ -133,7 +133,7 @@ def start_simulation():
                 ax.legend()
 
             global animation
-            animation = FuncAnimation(fig, update, frames=len(t_values), interval=20, repeat=False)
+            animation = FuncAnimation(fig, update, frames=len(t_values), interval=2, repeat=False)
             canvas.draw()
 
         except Exception as e:
