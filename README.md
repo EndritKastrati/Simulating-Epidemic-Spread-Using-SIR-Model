@@ -51,11 +51,14 @@ python file1.py
 ```
 <br><br><br>
 
-## Shembuj Ekzekutimi
+## Shembuj Ekzekutimi:
 
 - ### Video Ekzekutimi
-![Alt text](/SIR/foto_gif/SIR.gif)
+ ![Alt text](/SIR/foto_gif/SIR.gif)
 
+
+- ### Rastet kur Inputat jane Jo-Valid:
+ ![Alt text](/SIR/foto_gif/SIR2.gif)
 
 
 <br><br><br>
