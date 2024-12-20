@@ -48,6 +48,9 @@ start_button.pack(side=tk.LEFT, padx=5)
 stop_button = tk.Button(button_frame, text="Stop", bg="red", fg="white", width=10)
 stop_button.pack(side=tk.LEFT, padx=5)
 
+
+
+
 # ---- Main Panel for Simulation and Graphs ----
 main_frame = tk.Frame(root, padx=10, pady=10)
 main_frame.pack(side=tk.RIGHT, expand=True, fill=tk.BOTH)
@@ -125,10 +128,13 @@ def start_simulation():
             r_values = results[:, 3]
 
             def update(frame):
+
                 # Compute the actual frame index based on the skipping factor
                 actual_frame = frame * frame_skip
                 if actual_frame >= len(t_values):  # Ensure we don't exceed the data length
                     actual_frame = len(t_values) - 1
+
+
 
                 # Stop the simulation when the infected population is near zero
                 if i_values[actual_frame] <= 1:
@@ -145,6 +151,11 @@ def start_simulation():
                 ax.plot(t_values[:actual_frame + 1], s_values[:actual_frame + 1], label="Susceptible", color='blue')
                 ax.plot(t_values[:actual_frame + 1], i_values[:actual_frame + 1], label="Infected", color='red')
                 ax.plot(t_values[:actual_frame + 1], r_values[:actual_frame + 1], label="Recovered", color='green')
+
+                # Display the current day on the graph
+                day_label = f"Day: {t_values[actual_frame]:.0f}"
+                fig.text(0.8, 0.95, day_label, fontsize=10, verticalalignment='top',
+                         bbox=dict(boxstyle="round", facecolor='white', edgecolor='0.8'))
 
                 # Dynamically set the x-axis limits
                 safe_xlim = max(np.max(t_values[:actual_frame + 1]), 1)  # Ensure a valid range
