@@ -1,4 +1,3 @@
-@ -1,206 +1,194 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
 import matplotlib.pyplot as plt
@@ -108,10 +107,11 @@ def start_simulation():
             S0 = population - initial_infected
             I0 = initial_infected
             R0 = 0
+            t_max = 50  # Simulation runs for 50 time units
             tol = 1e-8  # Tolerance for solving equations
 
             # Solve the SIR model
-            results = solve_sir(S0, I0, R0, beta, gamma, 1000, tol)  # Use a large time limit for safety
+            results = solve_sir(S0, I0, R0, beta, gamma, t_max, tol)
             if results.shape[0] == 0:
                 raise ValueError("No results to plot.")
 
@@ -121,22 +121,35 @@ def start_simulation():
             i_values = results[:, 2]  # Proportion of infected
             r_values = results[:, 3]  # Proportion of recovered
 
-            # Dynamic stopping condition
-            epsilon = 1e-6  # Threshold to determine if infected population is effectively 0
+            # Initialize previous values for stability check
+            prev_s = s_values[0]
+            prev_i = i_values[0]
+            prev_r = r_values[0]
+            epsilon = 1e-6  # Tolerance for stability check
             stabilization_time = None  # To store the time of stabilization
 
             # Update the graph dynamically
             def update(frame):
-                nonlocal stabilization_time
+                nonlocal prev_s, prev_i, prev_r, stabilization_time
 
-                # Check if the infected population reaches 0 (or near 0)
-                if i_values[frame] < epsilon:
-                    stabilization_time = t_values[frame]  # Store the time of stabilization
-                    animation.event_source.stop()  # Stop the animation
-                    # Adjust the x-axis dynamically to end at the stabilization time
-                    ax.set_xlim(0, stabilization_time)
-                    canvas.draw()  # Redraw the canvas with updated limits
-                    return
+                # Check for stability (values stop changing significantly)
+                if frame > 0:
+                    delta_s = abs(s_values[frame] - prev_s)
+                    delta_i = abs(i_values[frame] - prev_i)
+                    delta_r = abs(r_values[frame] - prev_r)
+
+                    if delta_s < epsilon and delta_i < epsilon and delta_r < epsilon:
+                        stabilization_time = t_values[frame]  # Store stabilization time
+                        animation.event_source.stop()  # Stop the animation
+                        # Adjust the x-axis dynamically to end at the stabilization time
+                        ax.set_xlim(0, stabilization_time)
+                        canvas.draw()  # Redraw the canvas with updated limits
+                        return
+
+                    # Update previous values
+                    prev_s = s_values[frame]
+                    prev_i = i_values[frame]
+                    prev_r = r_values[frame]
 
                 # Plot the data
                 ax.clear()
@@ -161,7 +174,7 @@ def start_simulation():
                 ax.set_title("SIR Model Simulation")
                 ax.set_xlabel("Time (days)")
                 ax.set_ylabel("Population")
-                ax.set_xlim(0, t_values[frame])  # Dynamically adjust the x-axis as the simulation progresses
+                ax.set_xlim(0, t_max)  # Ensure x-axis covers the full simulation period initially
                 ax.set_ylim(0, population)  # Set y-axis to total population size
                 ax.legend()
 
@@ -175,7 +188,6 @@ def start_simulation():
 
     # Run the simulation in a separate thread
     threading.Thread(target=run_simulation).start()
-
 
 
 def stop_simulation():
