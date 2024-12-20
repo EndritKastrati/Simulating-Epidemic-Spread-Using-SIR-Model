@@ -20,9 +20,9 @@ def calculate_epidemic_duration(S0, I0, R0, beta, gamma, step_size=1.0, tol=1e-6
     t_values = results[:, 0]  # Time points
     i_values = results[:, 2]  # Infected population
 
-    # Find the time when infected population approaches zero
+    # Find the time when infected population falls below 1
     for t, I in zip(t_values, i_values):
-        if I <= tol:  # Check if infected population falls below threshold
+        if I < 1:
             return t  # Return the time (duration)
 
     # If the epidemic never fully resolves within t_max

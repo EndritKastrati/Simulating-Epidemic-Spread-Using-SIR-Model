@@ -6,7 +6,7 @@ from matplotlib.animation import FuncAnimation
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import matplotlib
 
-from SIRModel.calculate_epidemic_duration import calculate_epidemic_duration
+from SIR.calculate_epidemic_duration import calculate_epidemic_duration
 
 matplotlib.use('TkAgg')
 from sir_solver import solve_sir  # Import the solver function
@@ -112,11 +112,11 @@ def start_simulation():
             R0 = 0
 
             # Calculate epidemic duration
-            epidemic_duration = calculate_epidemic_duration(S0, I0, R0, beta, gamma)
+            epidemic_duration = calculate_epidemic_duration(S0, I0, R0, beta, gamma, 0.1)
             print(f"Epidemic Duration: {epidemic_duration:.2f} days")
 
-            # Solve the SIR model
-            results = solve_sir(S0, I0, R0, beta, gamma, t_max=epidemic_duration + 10, step_size=1.0)
+            # Adjust step size and t_max for more detailed results
+            results = solve_sir(S0, I0, R0, beta, gamma, t_max=10000, step_size=0.1)
 
             # Extract results
             t_values = results[:, 0]
@@ -125,25 +125,29 @@ def start_simulation():
             r_values = results[:, 3]
 
             def update(frame):
+                # Compute the actual frame index based on the skipping factor
+                actual_frame = frame * frame_skip
+                if actual_frame >= len(t_values):  # Ensure we don't exceed the data length
+                    actual_frame = len(t_values) - 1
+
                 # Stop the simulation when the infected population is near zero
-                if frame >= len(t_values) or i_values[frame] <= 0.1:
+                if i_values[actual_frame] <= 1:
                     animation.event_source.stop()
-                    print(f"Simulation stopped: Infected population reached near zero at day {t_values[frame]:.2f}.")
-                    ax.set_xlim(0, t_values[frame])  # Set the final x-axis range
-
-
+                    print(
+                        f"Simulation stopped: Infected population reached near zero at day {t_values[actual_frame]:.2f}.")
+                    ax.set_xlim(0, t_values[actual_frame])  # Set the final x-axis range
                     ax.legend()
                     canvas.draw()
                     return
 
                 # Clear the plot and update with current frame data
                 ax.clear()
-                ax.plot(t_values[:frame + 1], s_values[:frame + 1], label="Susceptible", color='blue')
-                ax.plot(t_values[:frame + 1], i_values[:frame + 1], label="Infected", color='red')
-                ax.plot(t_values[:frame + 1], r_values[:frame + 1], label="Recovered", color='green')
+                ax.plot(t_values[:actual_frame + 1], s_values[:actual_frame + 1], label="Susceptible", color='blue')
+                ax.plot(t_values[:actual_frame + 1], i_values[:actual_frame + 1], label="Infected", color='red')
+                ax.plot(t_values[:actual_frame + 1], r_values[:actual_frame + 1], label="Recovered", color='green')
 
                 # Dynamically set the x-axis limits
-                safe_xlim = max(np.max(t_values[:frame + 1]), 1)  # Use np.max for array handling
+                safe_xlim = max(np.max(t_values[:actual_frame + 1]), 1)  # Ensure a valid range
                 ax.set_xlim(0, safe_xlim)
 
                 # Set y-axis and graph labels
@@ -154,9 +158,12 @@ def start_simulation():
                 ax.legend()
                 canvas.draw()
 
-            # Run the animation
+            # Define the frame skipping factor
+            frame_skip = 4  # Skip every 5th frame
+
+            # Initialize the animation with frame skipping
             global animation
-            animation = FuncAnimation(fig, update, frames=len(t_values), interval=50, repeat=False)
+            animation = FuncAnimation(fig, update, frames=range(0, len(t_values) // frame_skip), interval=10, repeat=False)
             canvas.draw()
 
         except Exception as e:
