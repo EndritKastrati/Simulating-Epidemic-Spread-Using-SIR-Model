@@ -5,6 +5,7 @@ from matplotlib.animation import FuncAnimation
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import matplotlib
 
+
 matplotlib.use('TkAgg')
 from sir_solver import solve_sir  # Import the solver function
 import threading
@@ -108,77 +109,51 @@ def start_simulation():
             I0 = initial_infected
             R0 = 0
 
-            tol = 1e-8  # Tolerance for solving equations
-
-            # Solve the SIR model
-            results = solve_sir(S0, I0, R0, beta, gamma, 1000, tol)  # Use a large time limit for safety
+            # Solve the SIR model for the calculated duration
+            results = solve_sir(S0, I0, R0, beta, gamma, 500, 1e-8)
             if results.shape[0] == 0:
                 raise ValueError("No results to plot.")
 
             # Unpack results
             t_values = results[:, 0]  # Time values
-            s_values = results[:, 1]  # Proportion of susceptible
-            i_values = results[:, 2]  # Proportion of infected
-            r_values = results[:, 3]  # Proportion of recovered
+            s_values = results[:, 1] * population  # Susceptible scaled to population
+            i_values = results[:, 2] * population  # Infected scaled to population
+            r_values = results[:, 3] * population  # Recovered scaled to population
 
-            # Dynamic stopping condition
-            epsilon = 1e-6  # Threshold to determine if infected population is effectively 0
+            # Define a threshold for stopping
+            epsilon = 0.1  # Stop when infected count drops below this threshold
+            has_stopped = False  # Flag to ensure clean stopping
 
-
-
-            stabilization_time = None  # To store the time of stabilization
-
-            # Update the graph dynamically
+            # Update function for animation
             def update(frame):
-                nonlocal stabilization_time
+                nonlocal has_stopped  # Allow modification of stopping flag
 
-                # Check if the infected population reaches 0 (or near 0)
-                if i_values[frame] < epsilon:
-                    stabilization_time = t_values[frame]  # Store the time of stabilization
+                # Stop simulation if infected population is below threshold
+                if i_values[frame] <= epsilon and not has_stopped:
+                    has_stopped = True  # Mark as stopped
                     animation.event_source.stop()  # Stop the animation
-                    # Adjust the x-axis dynamically to end at the stabilization time
-                    ax.set_xlim(0, stabilization_time)
-                    canvas.draw()  # Redraw the canvas with updated limits
+
+                    # Finalize x-axis range safely
+                    if t_values[frame] > 0:
+                        ax.set_xlim(0, t_values[frame])  # Set x-axis to the current time
+                    else:
+                        ax.set_xlim(0, 1)  # Fallback range if t_values[frame] == 0
+                    canvas.draw()  # Update the canvas
                     return
 
-
-
-
-
-
-
-
-
-
-
-                # Plot the data
+                # Plot the data up to the current frame
                 ax.clear()
-                ax.plot(
-                    t_values[:frame],
-                    s_values[:frame] * population,
-                    label="Susceptible",
-                    color='blue'
-                )
-                ax.plot(
-                    t_values[:frame],
-                    i_values[:frame] * population,
-                    label="Infected",
-                    color='red'
-                )
-                ax.plot(
-                    t_values[:frame],
-                    r_values[:frame] * population,
-                    label="Recovered",
-                    color='green'
-                )
+                ax.plot(t_values[:frame], s_values[:frame], label="Susceptible", color='blue')
+                ax.plot(t_values[:frame], i_values[:frame], label="Infected", color='red')
+                ax.plot(t_values[:frame], r_values[:frame], label="Recovered", color='green')
                 ax.set_title("SIR Model Simulation")
                 ax.set_xlabel("Time (days)")
                 ax.set_ylabel("Population")
-                ax.set_xlim(0, t_values[frame])  # Dynamically adjust the x-axis as the simulation progresses
-                ax.set_ylim(0, population)  # Set y-axis to total population size
+                ax.set_xlim(0, max(t_values[frame], 1))  # Ensure the x-axis has a valid range
+                ax.set_ylim(0, population)  # Fixed y-axis range
                 ax.legend()
 
-            # Run animation
+            # Run the animation with frames limited to the epidemic duration
             global animation
             animation = FuncAnimation(fig, update, frames=len(t_values), interval=50, repeat=False)
             canvas.draw()
