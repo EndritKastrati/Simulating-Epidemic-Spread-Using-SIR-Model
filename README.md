@@ -58,7 +58,7 @@ python file1.py
 
 
 - ### Rastet kur Inputat jane Jo-Valid:
- ![Alt text](/SIR/foto_gif/SIR2.gif)
+ ![Alt text](/SIR/foto_gif/SIR2.png)
 
 
 <br><br><br>
