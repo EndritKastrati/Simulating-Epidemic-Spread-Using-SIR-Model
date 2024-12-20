@@ -6,7 +6,6 @@ from matplotlib.animation import FuncAnimation
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import matplotlib
 
-from SIR.calculate_epidemic_duration import calculate_epidemic_duration
 
 matplotlib.use('TkAgg')
 from sir_solver import solve_sir  # Import the solver function
@@ -92,15 +91,18 @@ def validate_inputs():
         messagebox.showerror("Input Error", str(e))
         return None
 
-
 def start_simulation():
     """Starts the SIR simulation."""
+    global day_label_obj  # Ensure day_label_obj is reset
+    day_label_obj = None
+
     inputs = validate_inputs()
     if not inputs:
         return  # Invalid inputs; stop execution
 
     stop_event.clear()  # Reset stop event
     ax.clear()  # Clear the graph
+
 
     def run_simulation():
         try:
@@ -114,10 +116,6 @@ def start_simulation():
             I0 = initial_infected
             R0 = 0
 
-            # Calculate epidemic duration
-            epidemic_duration = calculate_epidemic_duration(S0, I0, R0, beta, gamma, 0.1)
-            print(f"Epidemic Duration: {epidemic_duration:.2f} days")
-
             # Adjust step size and t_max for more detailed results
             results = solve_sir(S0, I0, R0, beta, gamma, t_max=10000, step_size=0.1)
 
@@ -127,22 +125,24 @@ def start_simulation():
             i_values = results[:, 2]
             r_values = results[:, 3]
 
+            # Persistent label for the current day
+            day_label_obj = fig.text(0.8, 0.95, "", fontsize=10, verticalalignment='top',
+                                     bbox=dict(boxstyle="round", facecolor='white', edgecolor='0.8'))
+
             def update(frame):
+                global day_label_obj # Access the global label object
 
                 # Compute the actual frame index based on the skipping factor
                 actual_frame = frame * frame_skip
                 if actual_frame >= len(t_values):  # Ensure we don't exceed the data length
                     actual_frame = len(t_values) - 1
 
-
-
                 # Stop the simulation when the infected population is near zero
-                if i_values[actual_frame] <= 1:
+                if i_values[actual_frame] <= 0.9 or actual_frame == len(t_values) - 1:
                     animation.event_source.stop()
                     print(
                         f"Simulation stopped: Infected population reached near zero at day {t_values[actual_frame]:.2f}.")
                     ax.set_xlim(0, t_values[actual_frame])  # Set the final x-axis range
-                    ax.legend()
                     canvas.draw()
                     return
 
@@ -152,10 +152,14 @@ def start_simulation():
                 ax.plot(t_values[:actual_frame + 1], i_values[:actual_frame + 1], label="Infected", color='red')
                 ax.plot(t_values[:actual_frame + 1], r_values[:actual_frame + 1], label="Recovered", color='green')
 
-                # Display the current day on the graph
-                day_label = f"Day: {t_values[actual_frame]:.0f}"
-                fig.text(0.8, 0.95, day_label, fontsize=10, verticalalignment='top',
-                         bbox=dict(boxstyle="round", facecolor='white', edgecolor='0.8'))
+                # Update the day label dynamically
+                if day_label_obj is not None:
+                    day_label_obj.set_text(f"Day: {t_values[actual_frame]:.0f}")  # Update existing label
+                else:
+                    # Create a new label if it doesn't exist
+                    day_label_obj = fig.text(0.8, 0.95, f"Day: {t_values[actual_frame]:.0f}", fontsize=10,
+                                             verticalalignment='top',
+                                             bbox=dict(boxstyle="round", facecolor='white', edgecolor='0.8'))
 
                 # Dynamically set the x-axis limits
                 safe_xlim = max(np.max(t_values[:actual_frame + 1]), 1)  # Ensure a valid range
@@ -170,17 +174,20 @@ def start_simulation():
                 canvas.draw()
 
             # Define the frame skipping factor
-            frame_skip = 4  # Skip every 5th frame
+            frame_skip = 4  # Skip every 4th frame
 
             # Initialize the animation with frame skipping
             global animation
-            animation = FuncAnimation(fig, update, frames=range(0, len(t_values) // frame_skip), interval=10, repeat=False)
+            frames = range(0, (len(t_values) + frame_skip - 1) // frame_skip)
+            animation = FuncAnimation(fig, update, frames=frames, interval=10, repeat=False)
             canvas.draw()
 
         except Exception as e:
             messagebox.showerror("Simulation Error", f"An error occurred: {e}")
 
     threading.Thread(target=run_simulation).start()
+
+
 
 def stop_simulation():
     """Stops the simulation."""
