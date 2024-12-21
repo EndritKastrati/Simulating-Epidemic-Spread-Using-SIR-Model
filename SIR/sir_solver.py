@@ -1,4 +1,4 @@
-from adaptive_rk import backward_euler_sir_full  # Import Backward Euler
+from adaptive_rk import backward_euler_sir # Import Backward Euler
 
 def solve_sir(S0, I0, R0, beta, gamma, t_max, step_size):
     """
@@ -24,7 +24,7 @@ def solve_sir(S0, I0, R0, beta, gamma, t_max, step_size):
 
     # Call Backward Euler Solver
     try:
-        results = backward_euler_sir_full(S0, I0, R0, beta, gamma, t_max, step_size)
+        results = backward_euler_sir(S0, I0, R0, beta, gamma, t_max, step_size)
         print(f"Solver completed successfully. First 5 results:\n{results[:5]}")
         return results
     except Exception as e:
