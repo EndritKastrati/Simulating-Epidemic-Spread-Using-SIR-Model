@@ -1,8 +1,8 @@
 import numpy as np
 
-def backward_euler_sir(S0, I0, R0, beta, gamma, t_max, step_size, tol=1e-6, max_iter=20):
+def backward_euler_sir_full(S0, I0, R0, beta, gamma, t_max, step_size, tol=1e-8, max_iter=20):
     """
-    Solve the SIR model using the Backward Euler method with Newton-Raphson iteration.
+    Solve the SIR model using the Backward Euler method with full Jacobian and Newton-Raphson iteration.
 
     Parameters:
         S0, I0, R0 (float): Initial values for Susceptible, Infected, and Recovered.
@@ -44,18 +44,32 @@ def backward_euler_sir(S0, I0, R0, beta, gamma, t_max, step_size, tol=1e-6, max_
             # Jacobian matrix components
             J11 = 1 + step_size * beta * I_next / (S + I + R)
             J12 = step_size * beta * S_next / (S + I + R)
+            J13 = 0
+
             J21 = -step_size * beta * I_next / (S + I + R)
             J22 = 1 + step_size * (beta * S_next / (S + I + R) - gamma)
+            J23 = 0
 
-            # Newton step corrections
-            delta_S = -f1 / J11
-            delta_I = -f2 / J22
-            delta_R = -f3
+            J31 = 0
+            J32 = -step_size * gamma
+            J33 = 1
+
+            # Construct the Jacobian matrix and residual vector
+            J = np.array([
+                [J11, J12, J13],
+                [J21, J22, J23],
+                [J31, J32, J33]
+            ])
+
+            F = np.array([-f1, -f2, -f3])
+
+            # Solve the linear system J * [dS, dI, dR] = -[f1, f2, f3] using Gaussian elimination
+            dS, dI, dR = gaussian_elimination(J, F)
 
             # Update guesses
-            S_next += delta_S
-            I_next += delta_I
-            R_next += delta_R
+            S_next += dS
+            I_next += dI
+            R_next += dR
 
             # Ensure non-negativity
             S_next = max(S_next, 0)
@@ -73,3 +87,41 @@ def backward_euler_sir(S0, I0, R0, beta, gamma, t_max, step_size, tol=1e-6, max_
         results.append([t, S, I, R])
 
     return np.array(results)
+
+def gaussian_elimination(A, b):
+    """
+    Solve the linear system Ax = b using Gaussian elimination.
+
+    Parameters:
+        A (np.array): Coefficient matrix (Jacobian).
+        b (np.array): Right-hand side vector (negative residuals).
+
+    Returns:
+        np.array: Solution vector x.
+    """
+    n = len(b)
+
+    # Forward elimination
+    for i in range(n):
+        # Make the diagonal element 1 by dividing the row
+        factor = A[i, i]
+        A[i, :] /= factor
+        b[i] /= factor
+
+        # Eliminate the current column in subsequent rows
+        for j in range(i + 1, n):
+            factor = A[j, i]
+            A[j, :] -= factor * A[i, :]
+            b[j] -= factor * b[i]
+
+    # Back substitution
+    x = np.zeros_like(b)
+    for i in range(n - 1, -1, -1):
+        x[i] = b[i] - np.dot(A[i, i + 1:], x[i + 1:])
+
+    return x
+
+# Example Usage
+# S0, I0, R0 = initial values; beta, gamma = infection and recovery rates; t_max = total time; step_size = time step
+results = backward_euler_sir_full(S0=990, I0=10, R0=0, beta=0.3, gamma=0.1, t_max=100, step_size=0.1)
+print(results)
