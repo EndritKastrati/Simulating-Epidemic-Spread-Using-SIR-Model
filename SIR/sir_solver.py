@@ -1,5 +1,4 @@
 from adaptive_rk import backward_euler_sir_full  # Import Backward Euler
-from sir_model import sir_derivatives
 
 def solve_sir(S0, I0, R0, beta, gamma, t_max, step_size):
     """
